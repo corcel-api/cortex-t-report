@@ -44,9 +44,14 @@ async def report_metadata(request: Request):
     address_message = verify_headers(headers)
     data = await request.json()
     metadatas = [Metadata(**metadata) for metadata in data["metadatas"]]
+    # Convert Pydantic models to dictionaries and update uid
+    metadata_dicts = []
     for metadata in metadatas:
-        metadata["uid"] = str(metadata["uid"])
-    logger.info(f"Received metadata from {address_message}: {metadatas}")
+        metadata_dict = metadata.model_dump()
+        metadata_dict["uid"] = str(metadata_dict["uid"])
+        metadata_dicts.append(metadata_dict)
+
+    logger.info(f"Received metadata from {address_message}: {metadata_dicts}")
 
     # Update with upsert
     try:
@@ -54,7 +59,7 @@ async def report_metadata(request: Request):
             METADATA_COLLECTION
         ).update_one(
             {"_id": address_message},
-            {"$set": {"metadatas": metadatas}},
+            {"$set": {"metadatas": metadata_dicts}},
             upsert=True,
         )
         return {"message": "Metadata received and stored"}
