@@ -3,3 +3,4 @@ uvicorn
 pandas
 motor
 substrate_interface
+loguru
