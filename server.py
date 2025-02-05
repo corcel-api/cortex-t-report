@@ -43,7 +43,8 @@ async def report_metadata(request: Request):
     headers = request.headers
     address_message = verify_headers(headers)
     data = await request.json()
-    metadatas = [Metadata(**metadata) for metadata in data["metadatas"]]
+    logger.info(f"Received data: {data}")
+    metadatas = [Metadata(**metadata) for metadata in data.values()]
     # Convert Pydantic models to dictionaries and update uid
     metadata_dicts = []
     for metadata in metadatas:
