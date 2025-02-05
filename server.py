@@ -42,14 +42,22 @@ def verify_headers(headers: dict):
 async def report_metadata(request: Request):
     headers = request.headers
     address_message = verify_headers(headers)
-    metadatas = await request.json()
-    metadatas = [Metadata(**metadata) for metadata in metadatas.values()]
+    data = await request.json()
+    metadatas = [Metadata(**metadata) for metadata in data["metadatas"]]
+    for metadata in metadatas:
+        metadata["uid"] = str(metadata["uid"])
     logger.info(f"Received metadata from {address_message}: {metadatas}")
-    data = {
-        "_id": address_message,
-        "metadatas": metadatas,
-    }
-    await mongodb_client.get_database(DATABASE_NAME).get_collection(
-        METADATA_COLLECTION
-    ).insert_one(data)
-    return {"message": "Metadata received"}
+
+    # Update with upsert
+    try:
+        await mongodb_client.get_database(DATABASE_NAME).get_collection(
+            METADATA_COLLECTION
+        ).update_one(
+            {"_id": address_message},
+            {"$set": {"metadatas": metadatas}},
+            upsert=True,
+        )
+        return {"message": "Metadata received and stored"}
+    except Exception as e:
+        logger.error(f"Error storing metadata: {e}")
+        raise HTTPException(status_code=500, detail=f"Error storing metadata: {str(e)}")
