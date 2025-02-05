@@ -17,11 +17,12 @@ def verify_headers(headers: dict):
     signature = headers.get("signature")
     message = headers.get("message")
     ss58_address = headers.get("ss58_address")
+    logger.info(f"Verifying headers: {headers}")
     if not signature:
         raise HTTPException(status_code=401, detail="Missing Authorization header")
 
     keypair = Keypair(ss58_address=ss58_address)
-    if not keypair.verify(signature, message):
+    if not keypair.verify(message, signature):
         raise HTTPException(status_code=401, detail="Invalid signature")
     address_message, timestamp = message.split(":")
     if time.time() - float(timestamp) > 60:
