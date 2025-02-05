@@ -4,6 +4,14 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from substrateinterface.keypair import Keypair
 import time
 import os
+from pydantic import BaseModel
+
+
+class Metadata(BaseModel):
+    uid: int
+    accumulate_score: float
+    credit: int
+
 
 METADATA_COLLECTION = "metadata"
 DATABASE_NAME = "cortex"
@@ -34,9 +42,14 @@ def verify_headers(headers: dict):
 async def report_metadata(request: Request):
     headers = request.headers
     address_message = verify_headers(headers)
-    metadata = await request.json()
-    logger.info(f"Received metadata from {address_message}: {metadata}")
+    metadatas = await request.json()
+    metadatas = [Metadata(**metadata) for metadata in metadatas.values()]
+    logger.info(f"Received metadata from {address_message}: {metadatas}")
+    data = {
+        "_id": address_message,
+        "metadatas": metadatas,
+    }
     await mongodb_client.get_database(DATABASE_NAME).get_collection(
         METADATA_COLLECTION
-    ).insert_one(metadata)
+    ).insert_one(data)
     return {"message": "Metadata received"}
