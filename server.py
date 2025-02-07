@@ -13,6 +13,21 @@ class Metadata(BaseModel):
     credit: int
 
 
+class BatchResponse(BaseModel):
+    batch_id: str
+    uid: int
+    model: str
+    score: float
+    response_time: float
+    invalid_reason: str
+    timestamp: float
+
+
+class BatchReport(BaseModel):
+    batch_id: str
+    responses: list[BatchResponse]
+
+
 METADATA_COLLECTION = "metadata"
 DATABASE_NAME = "cortex"
 
@@ -67,3 +82,38 @@ async def report_metadata(request: Request):
     except Exception as e:
         logger.error(f"Error storing metadata: {e}")
         raise HTTPException(status_code=500, detail=f"Error storing metadata: {str(e)}")
+
+
+@app.post("/api/report_batch")
+async def report_batch(request: Request):
+    headers = request.headers
+    address_message = verify_headers(headers)
+    data = await request.json()
+
+    # Validate the incoming data using Pydantic
+    batch_report = BatchReport(**data)
+
+    # Convert responses to dictionaries and update uid to string
+    responses = []
+    for response in batch_report.responses:
+        response_dict = response.model_dump()
+        response_dict["uid"] = str(response_dict["uid"])
+        responses.append(response_dict)
+
+    logger.info(f"Received batch responses from {address_message}: {responses}")
+
+    # Update with upsert
+    try:
+        await mongodb_client.get_database(DATABASE_NAME).get_collection(
+            METADATA_COLLECTION
+        ).update_one(
+            {"_id": address_message},
+            {"$set": {"responses": responses}},
+            upsert=True,
+        )
+        return {"message": "Batch responses received and stored"}
+    except Exception as e:
+        logger.error(f"Error storing batch responses: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Error storing batch responses: {str(e)}"
+        )
